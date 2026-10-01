@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#24302e">
+<meta name="robots" content="noindex,nofollow">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="cai">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<title>cai</title>
+<style>
+:root{--bg:#EEF1F0;--card:#fff;--ink:#1d2624;--muted:#5d6966;--line:#d4dbd8;--acc:#24302e;--err:#b33a2a}
+@media (prefers-color-scheme:dark){:root{--bg:#121716;--card:#1b2321;--ink:#e5ece9;--muted:#93a29e;--line:#2a3532;--acc:#cfd9d6;--err:#f08a74;color-scheme:dark}}
+*{box-sizing:border-box}html,body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+main{max-width:380px;margin:0 auto;padding:calc(56px + env(safe-area-inset-top,0px)) 16px 32px;display:flex;flex-direction:column;gap:18px}
+h1{margin:0;font-size:30px;letter-spacing:-.02em}
+.c{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:18px;display:flex;flex-direction:column;gap:12px}
+label{display:flex;flex-direction:column;gap:6px;font-size:13px;color:var(--muted);font-weight:600}
+input{font:inherit;color:var(--ink);background:var(--card);border:1px solid var(--line);border-radius:10px;padding:11px 12px}
+button{font:inherit;font-weight:700;border:0;border-radius:11px;padding:12px;background:var(--acc);color:var(--bg);cursor:pointer}
+button.l{background:none;color:var(--muted);font-weight:600;padding:4px}
+button:disabled{opacity:.5}
+p{margin:0}.e{color:var(--err);font-size:13.5px;min-height:1em}.m{color:var(--muted);font-size:13.5px}.o{text-align:center;color:var(--muted);font-size:13px}
+</style>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.min.js"></script>
+<script src="config.js"></script>
+</head>
+<body>
+<main><h1>cai</h1><div id="v" class="c"><p class="m">Loading…</p></div></main>
+<script>
+(function(){
+var C=window.C0||{}, sb=window.supabase.createClient(C.url,C.anonKey,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true}});
+var v=document.getElementById("v");
+function h(t,a,k){var e=document.createElement(t);for(var x in a){if(x==="text")e.textContent=a[x];else if(x.slice(0,2)==="on")e.addEventListener(x.slice(2),a[x]);else e.setAttribute(x,a[x]);}(k||[]).forEach(function(c){e.appendChild(c);});return e;}
+function nice(e){var m=(e&&e.message)||"";if(/Invalid login/i.test(m))return"Wrong email or password.";if(/not confirmed/i.test(m))return"Confirm your email first.";if(/already registered/i.test(m))return"That email already has a login.";if(/Signups not allowed|signup.*disabled/i.test(m))return"New logins are closed.";return m||"Something went wrong.";}
+function login(mode,msg){
+  var em=h("input",{type:"email",autocomplete:"email",required:"",id:"em"}),pw=h("input",{type:"password",autocomplete:mode==="in"?"current-password":"new-password",required:"",minlength:"6",id:"pw"}),er=h("p",{"class":"e",text:msg||""});
+  var b=h("button",{type:"submit",text:mode==="in"?"Sign in":"Create login"});
+  var f=h("form",{"class":"c",style:"padding:0;border:0"},[h("label",{},[document.createTextNode("Email"),em]),h("label",{},[document.createTextNode("Password"),pw]),er,b,
+    h("button",{"class":"l",type:"button",text:mode==="in"?"Create a login":"I already have a login",onclick:function(){login(mode==="in"?"up":"in");}})]);
+  f.addEventListener("submit",async function(e){e.preventDefault();er.textContent="";b.disabled=true;
+    try{if(mode==="in"){var r=await sb.auth.signInWithPassword({email:em.value.trim(),password:pw.value});if(r.error)throw r.error;go();}
+      else{var u=await sb.auth.signUp({email:em.value.trim(),password:pw.value,options:{emailRedirectTo:location.origin+location.pathname}});if(u.error)throw u.error;if(u.data.session)go();else login("in","Check your email for a confirmation link, then sign in.");}}
+    catch(x){er.textContent=nice(x);}finally{b.disabled=false;}});
+  v.replaceChildren(f);em.focus();}
+function setup(msg){
+  var er=h("p",{"class":"e",text:msg||""}),code=h("input",{maxlength:"6",placeholder:"6-letter code",style:"text-transform:uppercase;letter-spacing:.2em"});
+  v.replaceChildren(h("p",{"class":"m",text:"Start a new space, or join one with its code."}),
+    h("button",{type:"button",text:"Start new",onclick:async function(e){e.currentTarget.disabled=true;var r=await sb.rpc("c_new");if(r.error){er.textContent=r.error.message;e.currentTarget.disabled=false;return;}go();}}),
+    h("p",{"class":"o",text:"or"}),code,
+    h("button",{type:"button",text:"Join",onclick:async function(e){if(!code.value.trim())return;e.currentTarget.disabled=true;var r=await sb.rpc("c_join",{p:code.value.trim()});if(r.error){er.textContent=r.error.message;e.currentTarget.disabled=false;return;}go();}}),
+    er,h("button",{"class":"l",type:"button",text:"Sign out",onclick:async function(){await sb.auth.signOut();login("in");}}));}
+async function go(){
+  v.replaceChildren(h("p",{"class":"m",text:"Loading…"}));
+  var s=(await sb.auth.getSession()).data.session; if(!s) return login("in");
+  var m=await sb.rpc("c_me");
+  if(m.error) return login("in",nice(m.error)); if(!m.data) return setup();
+  var b=await sb.from("app_bundle").select("html").eq("id",1).maybeSingle();
+  if(b.error||!b.data) return v.replaceChildren(h("p",{"class":"e",text:"Couldn't load. Check your connection and refresh."}));
+  document.open(); document.write(b.data.html); document.close();
+}
+if(!C.url) v.replaceChildren(h("p",{"class":"e",text:"Not configured."})); else go();
+if("serviceWorker" in navigator && location.protocol==="https:") navigator.serviceWorker.register("sw.js").catch(function(){});
+})();
+</script>
+</body>
+</html>
