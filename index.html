@@ -32,6 +32,7 @@ p{margin:0}.e{color:var(--err);font-size:13.5px;min-height:1em}.m{color:var(--mu
 <main><h1>cai</h1><div id="v" class="c"><p class="m">Loading…</p></div></main>
 <script>
 (function(){
+var REC=/type=recovery/.test(location.hash||"")||/type=recovery/.test(location.search||"");
 var C=window.C0||{}, sb=window.supabase.createClient(C.url,C.anonKey,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true}});
 var v=document.getElementById("v");
 function h(t,a,k){var e=document.createElement(t);for(var x in a){if(x==="text")e.textContent=a[x];else if(x.slice(0,2)==="on")e.addEventListener(x.slice(2),a[x]);else e.setAttribute(x,a[x]);}(k||[]).forEach(function(c){e.appendChild(c);});return e;}
@@ -40,12 +41,29 @@ function login(mode,msg){
   var em=h("input",{type:"email",autocomplete:"email",required:"",id:"em"}),pw=h("input",{type:"password",autocomplete:mode==="in"?"current-password":"new-password",required:"",minlength:"6",id:"pw"}),er=h("p",{"class":"e",text:msg||""});
   var b=h("button",{type:"submit",text:mode==="in"?"Sign in":"Create login"});
   var f=h("form",{"class":"c",style:"padding:0;border:0"},[h("label",{},[document.createTextNode("Email"),em]),h("label",{},[document.createTextNode("Password"),pw]),er,b,
-    h("button",{"class":"l",type:"button",text:mode==="in"?"Create a login":"I already have a login",onclick:function(){login(mode==="in"?"up":"in");}})]);
+    h("button",{"class":"l",type:"button",text:mode==="in"?"Create a login":"I already have a login",onclick:function(){login(mode==="in"?"up":"in");}}),
+    mode==="in"?h("button",{"class":"l",type:"button",text:"Forgot password?",onclick:function(){forgot(em.value.trim());}}):document.createTextNode("")]);
   f.addEventListener("submit",async function(e){e.preventDefault();er.textContent="";b.disabled=true;
     try{if(mode==="in"){var r=await sb.auth.signInWithPassword({email:em.value.trim(),password:pw.value});if(r.error)throw r.error;go();}
       else{var u=await sb.auth.signUp({email:em.value.trim(),password:pw.value,options:{emailRedirectTo:location.origin+location.pathname}});if(u.error)throw u.error;if(u.data.session)go();else login("in","Check your email for a confirmation link, then sign in.");}}
     catch(x){er.textContent=nice(x);}finally{b.disabled=false;}});
   v.replaceChildren(f);em.focus();}
+function forgot(pre){
+  var em=h("input",{type:"email",autocomplete:"email",required:"",value:pre||""}),er=h("p",{"class":"e"}),b=h("button",{type:"submit",text:"Email me a reset link"});
+  var f=h("form",{"class":"c",style:"padding:0;border:0"},[h("p",{"class":"m",text:"Enter your login email. A link to set a new password will be sent to it."}),h("label",{},[document.createTextNode("Email"),em]),er,b,
+    h("button",{"class":"l",type:"button",text:"Back to sign in",onclick:function(){login("in");}})]);
+  f.addEventListener("submit",async function(e){e.preventDefault();er.textContent="";b.disabled=true;
+    try{var r=await sb.auth.resetPasswordForEmail(em.value.trim(),{redirectTo:location.origin+location.pathname});if(r.error)throw r.error;
+      v.replaceChildren(h("p",{"class":"m",text:"If that email has a login, a reset link is on its way. Open it on this phone. It can take a minute, and may land in spam."}),h("button",{"class":"l",type:"button",text:"Back to sign in",onclick:function(){login("in");}}));}
+    catch(x){er.textContent=/rate|security purposes|seconds/i.test((x&&x.message)||"")?"Too many tries. Wait a few minutes and try again.":nice(x);b.disabled=false;}});
+  v.replaceChildren(f);em.focus();}
+function newpw(){
+  var p1=h("input",{type:"password",autocomplete:"new-password",required:"",minlength:"6"}),p2=h("input",{type:"password",autocomplete:"new-password",required:"",minlength:"6"}),er=h("p",{"class":"e"}),b=h("button",{type:"submit",text:"Save new password"});
+  var f=h("form",{"class":"c",style:"padding:0;border:0"},[h("p",{"class":"m",text:"Choose a new password."}),h("label",{},[document.createTextNode("New password"),p1]),h("label",{},[document.createTextNode("Type it again"),p2]),er,b]);
+  f.addEventListener("submit",async function(e){e.preventDefault();er.textContent="";if(p1.value!==p2.value){er.textContent="The two passwords don't match.";return;}b.disabled=true;
+    try{var r=await sb.auth.updateUser({password:p1.value});if(r.error)throw r.error;REC=false;try{history.replaceState(null,"",location.pathname);}catch(_){}go();}
+    catch(x){er.textContent=nice(x);b.disabled=false;}});
+  v.replaceChildren(f);p1.focus();}
 function setup(msg){
   var er=h("p",{"class":"e",text:msg||""}),code=h("input",{maxlength:"6",placeholder:"6-letter code",style:"text-transform:uppercase;letter-spacing:.2em"});
   v.replaceChildren(h("p",{"class":"m",text:"Start a new space, or join one with its code."}),
@@ -55,7 +73,8 @@ function setup(msg){
     er,h("button",{"class":"l",type:"button",text:"Sign out",onclick:async function(){await sb.auth.signOut();login("in");}}));}
 async function go(){
   v.replaceChildren(h("p",{"class":"m",text:"Loading…"}));
-  var s=(await sb.auth.getSession()).data.session; if(!s) return login("in");
+  var s=(await sb.auth.getSession()).data.session; if(!s) return login("in",REC?"That reset link has expired. Ask for a new one.":"");
+  if(REC) return newpw();
   var m=await sb.rpc("c_me");
   if(m.error) return login("in",nice(m.error)); if(!m.data) return setup();
   var b=await sb.from("app_bundle").select("html").eq("id",1).maybeSingle();
